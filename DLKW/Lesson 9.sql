@@ -70,3 +70,40 @@ CREATE OR REPLACE EXTERNAL VOLUME iceberg_external_volume
 
 //check it worked
 desc external volume iceberg_external_volume;
+
+//make a new db
+create or replace database my_iceberg_db
+catalog = 'SNOWFLAKE'
+external_volume = 'iceberg_external_volume';
+
+
+//set variable to include our account locator so we don't overwrite each other
+set table_name = 'CCT_'||current_account();
+
+//make an iceberg table
+create or replace iceberg table identifier($table_name) (
+    point_id number(10,0)
+    , trail_name string
+    , coord_pair string
+    , distance_to_melanies decimal(20,10)
+    , user_name string
+)
+  BASE_LOCATION = $table_name
+  AS SELECT top 100
+    point_id
+    , trail_name
+    , coord_pair
+    , distance_to_melanies
+    , current_user()
+  FROM MELS_SMOOTHIE_CHALLENGE_DB.TRAILS.SMV_CHERRY_CREEK_TRAIL;
+
+//read from table
+select * from identifier($table_name);
+
+//Now we can update the iceberg table without affecting the underlying staged data
+update identifier($table_name)
+set user_name = 'Look at me go!'
+where point_id = 1;
+
+//and there it is. We can keep data in parquet on aws, but still interact with it like it was in snowflake
+select * from identifier($table_name);
